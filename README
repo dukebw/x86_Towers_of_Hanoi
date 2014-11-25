@@ -1,1 +1,8 @@
-This is the final project for CS2XA3.
+This is my final project for CS2XA3. My program is written in x86 assembly
+language, and meant to be assembled using the NASM assembler. I used some
+existing library files provided by Dr. Franek to the CS2XA3 class, namely,
+asm_io.asm, asm_io.inc, cdecl.h and driver.c.
+
+My project consists of an x86 assembly program called "hantow.asm" and a
+corresponding make file calld "makefile". We can create an executable "hantow"
+by typing "make hantow".
