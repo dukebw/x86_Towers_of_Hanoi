@@ -1,6 +1,6 @@
 ; Towers of Hanoi x86 assembly program
 ; Author: Brendan Duke
-; Modified: November 27, 2014
+; Modified: November 28, 2014
 ; My program is an implementation of a recursive solution to the Towers of
 ; Hanoi problem, and works for 2 to 8 disks.
 ; We can specify the number of disks with a command line argument.
@@ -22,6 +22,57 @@ SECTION .bss
 
 SECTION .text
    global asm_main
+
+;-----------------------------------------------------------------------------
+; Takes an argument in eax that is the number of discs, and initializes
+; Peg1 properly.
+Init:
+      push ebx      ; We will use ebx, ecx and edx, so save them.
+      push ecx
+      push edx
+      mov ebx,8     ; Set ebx to max numebr of discs.
+      ; ebx is the element of Peg1 that the smallest disc should start at
+      sub ebx,eax
+      shl ebx,2     ; Make ebx a double-word pointer.
+      mov ecx,eax   ; Copy number of discs to ecx.
+      dec ecx       ; Make ecx start at n-1.
+.Loop:
+      mov edx,eax   ; Set edx to eax-ecx
+      sub edx,ecx
+      mov [Peg1+ebx],edx ; Put next disc on Peg1
+      add ebx,4     ; Increment pointer to next element.
+      dec ecx       ; --ecx
+      cmp ecx,0     ; Check if ecx is below 0.
+      jge .Loop     ; Keep setting up peg until ecx < 0.
+      pop edx       ; Restore registers and return.
+      pop ecx
+      pop ebx
+      ret
+
+;-----------------------------------------------------------------------------
+; Determines the address of the first non-zero element of an array starting at 
+; eax.
+Find_top:
+      cmp dword [eax],0   ; Check if array element at eax is 0
+      jne .Exit      ; If it's not, then return.
+      add eax,4     ; Move pointer to next element.
+      jmp Find_top  ; Keep checking
+.Exit:
+      ret           ; Return to caller.
+
+;-----------------------------------------------------------------------------
+; Moves the top disc of the array addressed by eax to the array addressed by
+; ebx.
+Move_disc:
+      push ecx      ; We will use ecx, so save it.
+      call Find_top ; Put index of top element of "from" array in eax.
+      mov ecx,[eax] ; Move disc pointed to by eax temporarily to ecx.
+      mov [eax],dword 0 ; Zero the spot where the disc at eax used to be.
+      mov eax,ebx   ; Move address of "to" peg to eax.
+      call Find_top ; Find top of the "to" peg.
+      mov [eax-4],ecx ; Put disc from top of "from" peg to top of "to" peg.
+      pop ecx       ; Restore ecx and return.
+      ret
 
 ;-----------------------------------------------------------------------------
 ; Prints the array currently addressed by eax, using eax as a pointer to each
@@ -75,9 +126,9 @@ ArgcCheck:
 
 ;-----------------------------------------------------------------------------
 ; Checks that our argument n is an integer in the range [2,8].
+; Returns n as an integer in eax.
 RangeCheck:
-      push eax      ; We will use eax, ebx and ecx so we save the on the stack.
-      push ebx
+      push ebx      ; We will use ebx and ecx so we save them on the stack.
       push ecx
       mov ebx,[ebp+0xC] ; Put pointer to argv table in ebx.
       mov ebx,[ebx+4]   ; Put second argument in ebx (pointer to a string).
@@ -88,15 +139,14 @@ RangeCheck:
       cmp eax,'2'   ; Check if eax < '2'.
       jl .Error     ; If so print a range error.
       cmp eax,'8'   ; Check if eax > '8'.
-      jg .Error     ; If so print a rane error.
+      jg .Error     ; If so print a range error.
+      sub eax,'0'   ; Convert eax to an integer to return it.
       pop ecx       ; Pop used registers.
       pop ebx
-      pop eax
       ret           ; Return
 .Error:
       pop ecx       ; Pop used registers.
       pop ebx
-      pop eax
       jmp RangeErr ; Print a range error.
 
 ;-----------------------------------------------------------------------------
@@ -106,6 +156,7 @@ asm_main:
       pushad        ; Save all registers.
       call ArgcCheck ; Check that argc = 2 (one extra argument).
       call RangeCheck ; Check that n is in the range [2,8].
+      call Init     ; Initialize Peg1 with correct discs.
       call Print_arrays ; Test printing arrays.
       jmp Exit      ; Jump over ArgcErr to program exit.      
 
