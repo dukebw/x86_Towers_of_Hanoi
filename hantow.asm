@@ -54,15 +54,34 @@ Init:
 ; eax.
 Find_top:
       cmp dword [eax],0   ; Check if array element at eax is 0
-      jne .Exit      ; If it's not, then return.
+      jne .Exit     ; If it's not, then return.
       add eax,4     ; Move pointer to next element.
       jmp Find_top  ; Keep checking
 .Exit:
       ret           ; Return to caller.
 
 ;-----------------------------------------------------------------------------
-; Moves the top disc of the array addressed by eax to the array addressed by
-; ebx.
+; Takes peg addresses in eax and ebx, and returns those same addresses in
+; eax and ebx, with the other peg in edx.
+Find_mid:
+      push eax      ; Save eax.
+      mov eax,Peg_len ; Put peg length in eax.
+      mov edx,3     ; Set edx to 3.
+      mul edx       ; Set eax to 3*Peg_len
+      mov edx,eax   ; Set edx to 3*Peg_len.
+      pop eax       ; Restore eax.
+      sub eax,Peg1  ; Set eax to its offset from Peg1.
+      sub ebx,Peg1  ; Set ebx to its offset from Peg1.
+      sub edx,eax   ; edx = 3*Peg_len - eax's offset from Peg1.
+      sub edx,ebx   ; edx = 3*Peg_len - total offset of eax and ebx.
+      add eax,Peg1  ; Restore eax's address.
+      add ebx,Peg1  ; Restore ebx's address.
+      add edx,Peg1  ; edx now contains the address of the intermediate peg.
+      ret           ; Return.
+
+;-----------------------------------------------------------------------------
+; Moves the top disc of the array indexed by eax to the array addressed by
+; ebx. eax == 1 means Peg1, eax == 2 means Peg2, etc.
 Move_disc:
       push ecx      ; We will use ecx, so save it.
       call Find_top ; Put index of top element of "from" array in eax.
@@ -150,6 +169,60 @@ RangeCheck:
       jmp RangeErr ; Print a range error.
 
 ;-----------------------------------------------------------------------------
+; This function is the map loop of the program, and will print all the moves
+; to complete the "Towers of Hanoi" problem for the given number of discs.
+; Waits for the user to press <Enter> between moves.
+; Takes the number of discs as an argument in eax.
+Hanoi:
+      push ebx      ; We will use ebx, ecx and edx, so save them.
+      push ecx      ; ecx will hold the current number of discs.
+      push edx      ; edx will hold temporary calculations.
+      push ebp      ; ebp will be our "bottom of stack." Save it.
+      mov ebp,esp   ; ebp will hold the original stack pointer value.
+      push Peg1     ; Set "from" peg to Peg1. 
+      push Peg3     ; Set "to" peg to Peg3.
+      push eax      ; Push "n" discs.
+.While:
+      pop ecx       ; Pop "k discs" into ecx.
+      pop ebx       ; Pop "to" peg into ebx.
+      pop eax       ; Pop "from" peg into eax.
+      cmp ecx,1     ; Check if number of discs == 1.
+      jne .Else     ; If k != 1, replace stack with 3 smaller stacks.
+      call Move_disc ; Move the 1 disc from its source to destination.
+      call Print_arrays ; Print the pegs.
+      cmp esp,ebp   ; Check if stack is "empty." 
+      je .Exit      ; If so exit the function.
+      jmp .While    ; Repeat loop.
+.Else:
+      ; Replace current move on stack with 3 moves: first put k-1 discs
+      ; from source to intermediate, then put kth disc from source to dest,
+      ; then put k-1 discs from intermediate to dest.
+      ; Third, push k-1 disks from intermediate peg (!= eax and != ebx) to 
+      ; destination.
+      call Find_mid ; Set edx to intermediate between eax and ebx.
+      dec ecx       ; ecx = k-1.
+      push edx      ; Push new "from" peg (intermediate).
+      push ebx      ; Push new "to" peg (dest).
+      push ecx      ; Push k-1.
+      ; Push the move corresponding to moving the bottom disc from source to
+      ; destination.
+      push eax      ; Push source.
+      push ebx      ; Push dest.
+      push 1        ; Push number of discs = 1.
+      ; First, Push the move meaning move the k-1 discs from the source peg to 
+      ; the intermediate peg.
+      push eax      ; Push source peg.
+      push edx      ; Push intermediate peg
+      push ecx      ; Push k-1.
+      jmp .While    ; Repeat Hanoi function.
+.Exit:
+      pop ebp       ; Restore all registers and return.
+      pop edx       
+      pop ecx       
+      pop ebx       
+      ret
+
+;-----------------------------------------------------------------------------
 ; The program enters here (asm_main is called from a main in asm_io.asm).
 asm_main:
       enter 0,0     ; Enter the subroutine.
@@ -157,7 +230,8 @@ asm_main:
       call ArgcCheck ; Check that argc = 2 (one extra argument).
       call RangeCheck ; Check that n is in the range [2,8].
       call Init     ; Initialize Peg1 with correct discs.
-      call Print_arrays ; Test printing arrays.
+      call Print_arrays ; Print initial peg set-up.
+      call Hanoi    ; Solve the Towers of Hanoi puzzle.
       jmp Exit      ; Jump over ArgcErr to program exit.      
 
 ;-----------------------------------------------------------------------------
