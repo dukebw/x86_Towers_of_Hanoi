@@ -14,6 +14,9 @@ SECTION .data
   Peg3 dd 0,0,0,0,0,0,0,0,9
   Peg_len equ $-Peg3 ; Peg_len contains the length in bytes of a peg array.
 
+  ; String for the peg base
+  Peg_base db "XXXXXXXXXXXXXXXXXXX",0
+
   ; String for errors.
   ErrMsg1 db "Invalid number of arguments.",10,0
   ErrMsg2 db "Invalid argument.",10,0
@@ -94,41 +97,97 @@ Move_disc:
       ret
 
 ;-----------------------------------------------------------------------------
-; Prints the array currently addressed by eax, using eax as a pointer to each
-; element.
-Display_array:
-      push ebx      ; We will use ebx, so we save it.
-      push esi      ; We will use esi, so we save it.
-      mov esi,0     ; esi will index the array so we set it to zero.
-      mov ebx,eax   ; Put base address of array in eax.
+; Print n characters, where the character is an argument in eax and n is
+; an argument in ebx.
+Print_chars:
+      push ebx      ; We change ebx, so save it.
 .Loop:
-      mov eax,dword [ebx+esi] ; Put current element of array in eax. 
-      call print_int ; Print element.
-      mov eax,' '   ; Put format character ' ' in eax.
-      call print_char ; Print space.
-      add esi,4     ; eax+esi points to next int in array.
-      cmp esi,Peg_len ; Check if pointer points to end of array
-      jl .Loop      ; If not, print next number.
-      mov eax,ebx   ; Restore base of array to eax.
-      pop esi       ; Restore registers and return.
-      pop ebx
+      cmp ebx,0     ; Check if ebx > 0.
+      jle .Exit     ; Return if ebx <= 0.
+      call print_char ; Print whatever character is in eax.
+      dec ebx       ; --ebx.
+      jmp .Loop
+.Exit:
+      pop ebx       ; Restore ebx and return.
       ret
 
+;-----------------------------------------------------------------------------
+; Prints 9-x[i] spaces, x[i] '+', a '|', x[i] '+', then 9-x[i] spaces then 
+; a <TAB>
+Print_row:
+      push ecx      ; We use ecx and ebx, so save them.
+      push ebx
+      mov ecx,eax   ; Make ecx the pointer to the array, to free up eax.
+      mov ebx,9     ; Set ebx to 9.
+      sub ebx,[ecx] ; Set ebx to 9-x[i].
+      mov eax,' '   ; Set eax to space.
+      call Print_chars ; Print 9-x[i] spaces
+      mov ebx,[ecx] ; Set ebx = xi
+      mov eax,'+'   ; Set eax to '+'.
+      call Print_chars ; Print x[i] '+'.
+      mov eax,'|'   ; Set eax to '|'.
+      call print_char ; Print '|'.
+      mov eax,'+'   ; Set eax to '+'.
+      call Print_chars ; Print x[i] '+'.
+      neg ebx       ; ebx = -x[i].
+      add ebx,9     ; ebx = 9 - x[i].
+      mov eax,' '   ; Set eax to space.
+      call Print_chars ; Print 9-x[i] spaces.
+      mov eax,9     ; Set eax to ASCII value for <TAB>.
+      call print_char ; Print <TAB>.
+      mov eax,ecx   ; Restore eax.
+      pop ebx       ; Restore registers and return.
+      pop ecx
+      ret
+
+;-----------------------------------------------------------------------------
+; Takes an offset from Peg1 as an argument.
+; Prints a set of 3 rows of discs on the 3 different pegs.
+Print_rows:
+      push eax       ; We use eax, so save it.
+      add eax,Peg1   ; Add the base address of Peg1 to eax.
+      call Print_row ; Print first row.
+      add eax,Peg_len ; Set eax to corresponding element of next peg.
+      call Print_row ; Print second row.
+      add eax,Peg_len ; Set eax to element of third peg.
+      call Print_row ; Print 3rd row
+      call print_nl ; Print newline.
+      pop eax       ; Restore eax.
+      ret           ; Return.
+
+;-----------------------------------------------------------------------------
+; Prints a base and a tab.
+Print_base:
+      mov eax,Peg_base ; Put peg base string in eax.
+      call print_string ; Call C to print.
+      mov eax,9     ; Put <TAB> ASCII value in eax
+      call print_char ; Print <TAB>.
+      ret           ; Return.
+      
+;-----------------------------------------------------------------------------
+; Prints disc move in the format required by Dr. Franek's assignment outline.
 Print_arrays:
-      push eax      ; We will use eax so we save it on the stack.
-      mov eax,Peg1  ; Set eax to base of first array.
-      call Display_array ; Print first array.
-      mov eax,9     ; Put ASCII value for TAB in eax.
-      call print_char ; Print a tab.
-      mov eax,Peg2  ; Set eax to base of second array.
-      call Display_array ; Print second array.
-      mov eax,9     ; Put ASCII value for TAB in eax.
-      call print_char ; Print a tab.
-      mov eax,Peg3  ; Set eax to base of third array.
-      call Display_array ; Print third array.
-      call print_nl ; Print formatting newline
+      push eax      ; We use eax, so save it.
+      mov eax,0     ; Initialize eax to zero.
+.Loop:
+      call Print_rows ; Print first rows.
+      add eax,4     ; Let eax point at the next element.
+      cmp eax,32    ; Check if eax points past 8th element.
+      jb .Loop       ; If not, keep printing rows.
+      call Print_base ; Print a base.
+      call Print_base ; Print a second base.
+      call Print_base ; Print a third base.
+      call print_nl ; Print a newline.
       pop eax       ; Restore eax and return.
       ret
+
+;-----------------------------------------------------------------------------
+; Waits for <Enter> to be pressed, discarding other characters.
+Wait_enter:
+      call read_char ; Read a character.
+      cmp eax,10    ; Compare read character with ASCII code for newline.
+      jne Wait_enter ; Keep reading characters until a newline is found
+      ret           ; Return.
 
 ;-----------------------------------------------------------------------------
 ; Checks that we only have one.
@@ -189,6 +248,7 @@ Hanoi:
       cmp ecx,1     ; Check if number of discs == 1.
       jne .Else     ; If k != 1, replace stack with 3 smaller stacks.
       call Move_disc ; Move the 1 disc from its source to destination.
+      call Wait_enter ; Wait for <Enter>.
       call Print_arrays ; Print the pegs.
       cmp esp,ebp   ; Check if stack is "empty." 
       je .Exit      ; If so exit the function.
