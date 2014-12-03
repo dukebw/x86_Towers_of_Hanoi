@@ -1,6 +1,6 @@
 ; Towers of Hanoi x86 assembly program
 ; Author: Brendan Duke
-; Modified: November 28, 2014
+; Modified: December 1, 2014
 ; My program is an implementation of a recursive solution to the Towers of
 ; Hanoi problem, and works for 2 to 8 disks.
 ; We can specify the number of disks with a command line argument.
@@ -33,7 +33,7 @@ Init:
       push ebx      ; We will use ebx, ecx and edx, so save them.
       push ecx
       push edx
-      mov ebx,8     ; Set ebx to max numebr of discs.
+      mov ebx,8     ; Set ebx to max number of discs.
       ; ebx is the element of Peg1 that the smallest disc should start at
       sub ebx,eax
       shl ebx,2     ; Make ebx a double-word pointer.
